@@ -1,7 +1,6 @@
 fastapi
-uvicorn[standard]
-python-multipart
-pydantic
-pypdf
+uvicorn
 openai
 supabase
+python-multipart
+PyPDF2
