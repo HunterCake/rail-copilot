@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Rail Engineering Copilot</title>
+</head>
+<body style="max-width:900px;margin:40px auto;font-family:system-ui">
+  <h1>Rail Engineering Copilot (MVP)</h1>
+
+  <p>Scrivi una domanda:</p>
+  <textarea id="q" rows="6" style="width:100%"></textarea>
+  <button id="btn" style="margin-top:12px">Chiedi</button>
+
+  <h3>Risposta</h3>
+  <pre id="a" style="white-space:pre-wrap;margin-top:10px;background:#f6f6f6;padding:12px;border-radius:8px"></pre>
+
+  <script>
+    const BACKEND = "https://rail-copilot-backend.onrender.com"; // <-- il tuo backend
+
+    document.getElementById("btn").onclick = async () => {
+      const msg = document.getElementById("q").value.trim();
+      if (!msg) return;
+
+      document.getElementById("a").textContent = "Sto pensando...";
+      const r = await fetch(BACKEND + "/chat", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({message: msg})
+      });
+      const data = await r.json();
+      document.getElementById("a").textContent = data.answer || "Errore";
+    };
+  </script>
+</body>
+</html>
