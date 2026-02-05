@@ -1,25 +1,52 @@
+import io
+from pypdf import PdfReader
 from app.embeddings import embed_text
 from app.supabase_client import supabase
-from PyPDF2 import PdfReader
-import uuid
 
-async def ingest_pdf(title: str, source: str, file):
-    reader = PdfReader(file.file)
-    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+async def ingest_pdf(file, title: str, source: str):
+    content = await file.read()
+    if not content:
+        raise ValueError("Empty file")
 
-    chunks = [text[i:i+1000] for i in range(0, len(text), 1000)]
+    reader = PdfReader(io.BytesIO(content))
+    text = "\n".join((page.extract_text() or "") for page in reader.pages)
 
-    for idx, chunk in enumerate(chunks):
-        embedding = embed_text(chunk)
+    if not text.strip():
+        raise ValueError("No extractable text from PDF")
 
-        supabase.table("chunks").insert({
-            "document_id": str(uuid.uuid4()),
-            "chunk_index": idx,
-            "content": chunk,
+    # 1) Inserisci documento e RICHIEDI esplicitamente il record inserito
+    doc_res = (
+        supabase
+        .table("documents")
+        .insert({"title": title, "source": source})
+        .select("id")
+        .single()
+        .execute()
+    )
+
+    if not doc_res.data or "id" not in doc_res.data:
+        raise RuntimeError(f"documents insert failed or returned no id: {doc_res}")
+
+    document_id = doc_res.data["id"]
+
+    # 2) Embedding
+    embedding = embed_text(text[:8000])  # limito per costo/tempo
+
+    # 3) Inserisci chunk col document_id corretto
+    chunk_res = (
+        supabase
+        .table("chunks")
+        .insert({
+            "document_id": document_id,
+            "chunk_index": 0,
+            "content": text[:8000],
             "embedding": embedding
-        }).execute()
+        })
+        .execute()
+    )
 
     return {
         "status": "ok",
-        "chunks": len(chunks)
+        "document_id": document_id,
+        "chunks_inserted": len(chunk_res.data or [])
     }
